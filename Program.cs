@@ -45,6 +45,8 @@ public sealed class OverlayWindow : Window
     private static readonly Brush HitBackground = CreateHitBackground();
 
     private readonly InkCanvas ink = new();
+    private readonly Border whiteboard = new() { Background = Brushes.White, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+    public bool WhiteboardVisible => whiteboard.Visibility == Visibility.Visible;
     private readonly Canvas shapes = new();
     private readonly List<object> history = new();
     private Point? origin;
@@ -73,6 +75,7 @@ public sealed class OverlayWindow : Window
         var root = new Grid { Background = HitBackground };
         ink.Background = HitBackground;
         shapes.IsHitTestVisible = false;
+        root.Children.Add(whiteboard);
         root.Children.Add(ink);
         root.Children.Add(shapes);
         Content = root;
@@ -255,6 +258,13 @@ public sealed class OverlayWindow : Window
         }
     }
 
+    // 기존 판서를 지우지 않고 흰 배경만 전환합니다.
+    public void ToggleWhiteboard()
+    {
+        whiteboard.Visibility = WhiteboardVisible ? Visibility.Collapsed : Visibility.Visible;
+        ToolStateChanged?.Invoke();
+    }
+
     public void Clear()
     {
         FinishShape();
@@ -271,6 +281,8 @@ public sealed class ToolbarWindow : Window
     private static readonly Brush LabelBrush = new SolidColorBrush(Color.FromRgb(160, 168, 186));
 
     private readonly OverlayWindow overlay;
+    private ShortcutManager? shortcuts;
+    private Button? whiteboardButton;
     private readonly StackPanel panel = new() { Margin = new Thickness(6) };
     private readonly Dictionary<DrawTool, Button> toolButtons = new();
     private readonly List<(Button Button, Color Color)> colorButtons = new();
@@ -332,7 +344,12 @@ public sealed class ToolbarWindow : Window
         
         panel.Children.Add(MakeIconButton("되돌리기", "M 9,5 L 3,11 9,17 M 3,11 L 15,11 C 23,11 23,21 16,21", overlay.Undo));
         panel.Children.Add(MakeIconButton("전체 지우기", "M 5,7 L 19,7 M 9,7 L 9,4 15,4 15,7 M 7,9 L 8,21 16,21 17,9 M 11,11 L 11,18 M 14,11 L 14,18", overlay.Clear));
+        whiteboardButton = MakeIconButton("흰 배경 켜기/끄기", "M 3,4 L 21,4 21,20 3,20 Z M 7,9 L 17,9 M 7,13 L 15,13", overlay.ToggleWhiteboard);
+        panel.Children.Add(whiteboardButton);
+        panel.Children.Add(MakeIconButton("단축키 설정", "M 4,7 L 20,7 20,18 4,18 Z M 7,11 L 9,11 M 11,11 L 13,11 M 15,11 L 17,11 M 8,15 L 16,15", () => shortcuts?.ShowSettings(this)));
         panel.Children.Add(MakeIconButton("종료", "M 5,5 L 19,19 M 19,5 L 5,19", Close));
+        SourceInitialized += (_, _) => shortcuts = new ShortcutManager(this, overlay);
+        Closed += (_, _) => shortcuts?.Dispose();
 
         overlay.ToolStateChanged += Refresh;
         Refresh();
@@ -425,6 +442,7 @@ public sealed class ToolbarWindow : Window
 
     private void Refresh()
     {
+        if (whiteboardButton != null) whiteboardButton.Background = overlay.WhiteboardVisible ? ActiveBrush : NormalBrush;
         foreach (var (tool, button) in toolButtons)
             button.Background = tool == overlay.Tool ? ActiveBrush : NormalBrush;
         foreach (var (button, color) in colorButtons)
