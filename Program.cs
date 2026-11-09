@@ -283,7 +283,7 @@ public sealed class ToolbarWindow : Window
     private readonly OverlayWindow overlay;
     private ShortcutManager? shortcuts;
     private Button? whiteboardButton;
-    private readonly StackPanel panel = new() { Margin = new Thickness(6) };
+    private readonly StackPanel panel = new() { Margin = new Thickness(3) };
     private readonly Dictionary<DrawTool, Button> toolButtons = new();
     private readonly List<(Button Button, Color Color)> colorButtons = new();
     private readonly List<(Button Button, double Size)> sizeButtons = new();
@@ -292,9 +292,9 @@ public sealed class ToolbarWindow : Window
     {
         overlay = target;
         Title = "Epic Pen";
-        Width = 78;
+        Width = 52;
         SizeToContent = SizeToContent.Height;
-        Left = SystemParameters.WorkArea.Right - 98;
+        Left = SystemParameters.WorkArea.Right - 64;
         Top = SystemParameters.WorkArea.Top + 80;
         Topmost = true;
         ShowInTaskbar = false;
@@ -318,8 +318,8 @@ public sealed class ToolbarWindow : Window
             var button = MakeButton("", () => overlay.SetColor(color));
             button.ToolTip = name;
             System.Windows.Automation.AutomationProperties.SetName(button, name);
-            button.Width = 24; button.Height = 24;
-            button.Margin = new Thickness(2);
+            button.Width = 19; button.Height = 19;
+            button.Margin = new Thickness(1);
             button.Background = new SolidColorBrush(color);
             button.BorderThickness = new Thickness(3);
             colors.Children.Add(button);
@@ -334,7 +334,7 @@ public sealed class ToolbarWindow : Window
             var button = MakeButton(label, () => overlay.SetThickness(size));
             button.Content = MakeSizeIcon(size); button.ToolTip = label;
             System.Windows.Automation.AutomationProperties.SetName(button, label);
-            button.Width = 32; button.Height = 28;
+            button.Width = 36; button.Height = 25;
             button.Margin = new Thickness(2);
             sizes.Children.Add(button);
             sizeButtons.Add((button, size));
@@ -376,10 +376,10 @@ public sealed class ToolbarWindow : Window
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
             Stretch = Stretch.Uniform,
-            Width = 23,
-            Height = 23
+            Width = 21,
+            Height = 21
         };
-        button.Height = 39;
+        button.Height = 34;
         button.ToolTip = label;
         System.Windows.Automation.AutomationProperties.SetName(button, label);
         return button;
@@ -407,7 +407,7 @@ public sealed class ToolbarWindow : Window
         {
             Content = label,
             Height = 30,
-            Margin = new Thickness(0, 2, 0, 2),
+            Margin = new Thickness(0, 1, 0, 1),
             Foreground = Brushes.White,
             Background = NormalBrush,
             BorderBrush = Brushes.Transparent,
