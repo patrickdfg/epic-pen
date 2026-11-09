@@ -280,9 +280,9 @@ public sealed class ToolbarWindow : Window
     {
         overlay = target;
         Title = "Epic Pen";
-        Width = 136;
+        Width = 78;
         SizeToContent = SizeToContent.Height;
-        Left = SystemParameters.WorkArea.Right - 156;
+        Left = SystemParameters.WorkArea.Right - 98;
         Top = SystemParameters.WorkArea.Top + 80;
         Topmost = true;
         ShowInTaskbar = false;
@@ -291,22 +291,22 @@ public sealed class ToolbarWindow : Window
         Background = new SolidColorBrush(Color.FromRgb(30, 35, 48));
         Content = panel;
 
-        AddTool("마우스 (Esc)", DrawTool.Mouse);
-        AddTool("펜", DrawTool.Pen);
-        AddTool("형광펜", DrawTool.Highlighter);
-        AddTool("지우개", DrawTool.Eraser);
-        AddTool("직선", DrawTool.Line);
-        AddTool("사각형", DrawTool.Rectangle);
-        AddTool("원", DrawTool.Ellipse);
+        AddTool("마우스 (Esc)", DrawTool.Mouse, "M 3,2 L 3,20 8,15 12,23 15,21 11,13 19,13 Z");
+        AddTool("펜", DrawTool.Pen, "M 4,19 L 5,15 17,3 21,7 9,19 Z M 15,5 L 19,9");
+        AddTool("형광펜", DrawTool.Highlighter, "M 4,17 L 15,6 19,10 8,21 Z M 13,4 L 16,1 22,7 19,10 M 3,23 L 14,23");
+        AddTool("지우개", DrawTool.Eraser, "M 3,15 L 13,4 22,13 13,22 8,22 Z M 9,21 L 17,12");
+        AddTool("직선", DrawTool.Line, "M 3,21 L 21,3");
+        AddTool("사각형", DrawTool.Rectangle, "M 4,4 L 20,4 20,20 4,20 Z");
+        AddTool("원", DrawTool.Ellipse, "M 12,3 A 9,9 0 1 1 11.99,3 Z");
 
-        AddLabel("색");
+        
         var colors = new WrapPanel();
         foreach (var (name, color) in new[] { ("빨강", Colors.Red), ("파랑", Colors.DodgerBlue), ("노랑", Colors.Gold), ("초록", Colors.LimeGreen), ("검정", Colors.Black), ("흰색", Colors.White) })
         {
             var button = MakeButton("", () => overlay.SetColor(color));
             button.ToolTip = name;
             System.Windows.Automation.AutomationProperties.SetName(button, name);
-            button.Width = 32; button.Height = 26;
+            button.Width = 24; button.Height = 24;
             button.Margin = new Thickness(2);
             button.Background = new SolidColorBrush(color);
             button.BorderThickness = new Thickness(3);
@@ -315,34 +315,65 @@ public sealed class ToolbarWindow : Window
         }
         panel.Children.Add(colors);
 
-        AddLabel("굵기");
+        
         var sizes = new WrapPanel();
         foreach (var (label, size) in new[] { ("가늘게", 2.0), ("보통", 4.0), ("굵게", 9.0) })
         {
             var button = MakeButton(label, () => overlay.SetThickness(size));
-            button.Width = 50; button.Height = 26;
+            button.Content = MakeSizeIcon(size); button.ToolTip = label;
+            System.Windows.Automation.AutomationProperties.SetName(button, label);
+            button.Width = 32; button.Height = 28;
             button.Margin = new Thickness(2);
             sizes.Children.Add(button);
             sizeButtons.Add((button, size));
         }
         panel.Children.Add(sizes);
 
-        AddLabel("편집");
-        panel.Children.Add(MakeButton("되돌리기", overlay.Undo));
-        panel.Children.Add(MakeButton("전체 지우기", overlay.Clear));
-        panel.Children.Add(MakeButton("종료", Close));
+        
+        panel.Children.Add(MakeIconButton("되돌리기", "M 9,5 L 3,11 9,17 M 3,11 L 15,11 C 23,11 23,21 16,21", overlay.Undo));
+        panel.Children.Add(MakeIconButton("전체 지우기", "M 5,7 L 19,7 M 9,7 L 9,4 15,4 15,7 M 7,9 L 8,21 16,21 17,9 M 11,11 L 11,18 M 14,11 L 14,18", overlay.Clear));
+        panel.Children.Add(MakeIconButton("종료", "M 5,5 L 19,19 M 19,5 L 5,19", Close));
 
         overlay.ToolStateChanged += Refresh;
         Refresh();
         Closed += (_, _) => overlay.Close();
     }
 
-    private void AddTool(string label, DrawTool tool)
+    private void AddTool(string label, DrawTool tool, string path)
     {
-        var button = MakeButton(label, () => overlay.SetTool(tool));
+        var button = MakeIconButton(label, path, () => overlay.SetTool(tool));
         toolButtons[tool] = button;
         panel.Children.Add(button);
     }
+
+    // 외부 이미지나 아이콘 글꼴 없이 벡터 경로로 도구 아이콘을 표시합니다.
+    private static Button MakeIconButton(string label, string path, Action action)
+    {
+        var button = MakeButton("", action);
+        button.Content = new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse(path),
+            Stroke = Brushes.White,
+            StrokeThickness = 2,
+            StrokeLineJoin = PenLineJoin.Round,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            Stretch = Stretch.Uniform,
+            Width = 23,
+            Height = 23
+        };
+        button.Height = 39;
+        button.ToolTip = label;
+        System.Windows.Automation.AutomationProperties.SetName(button, label);
+        return button;
+    }
+
+    private static UIElement MakeSizeIcon(double size) => new Ellipse
+    {
+        Width = size + 4,
+        Height = size + 4,
+        Fill = Brushes.White
+    };
 
     private void AddLabel(string text) =>
         panel.Children.Add(new TextBlock
