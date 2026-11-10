@@ -133,11 +133,13 @@ public sealed class MouseHighlightWindow : Window
             Title = "마우스 강조 설정",
             Owner = owner,
             Width = 310,
-            Height = 330,
+            Height = 365,
             ResizeMode = ResizeMode.NoResize,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
         var panel = new StackPanel { Margin = new Thickness(16) };
+        var enabled = new CheckBox { Content = "마우스 강조 표시 켜기", IsChecked = Enabled, Margin = new Thickness(0, 0, 0, 12) };
+        panel.Children.Add(enabled);
         panel.Children.Add(new TextBlock { Text = "원 크기" });
         var size = new Slider { Minimum = 30, Maximum = 140, Value = Diameter, TickFrequency = 10, IsSnapToTickEnabled = true };
         panel.Children.Add(size);
@@ -162,6 +164,7 @@ public sealed class MouseHighlightWindow : Window
         save.Click += (_, _) =>
         {
             Configure(size.Value, choices[color.SelectedIndex].Color, opacity.Value, pulse.IsChecked == true);
+            SetEnabled(enabled.IsChecked == true);
             dialog.Close();
         };
         panel.Children.Add(save);
