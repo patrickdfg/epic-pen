@@ -312,6 +312,7 @@ public sealed class ToolbarWindow : Window
 
     private readonly OverlayWindow overlay;
     private ShortcutManager? shortcuts;
+    private readonly MouseHighlightWindow mouseHighlight = new();
     private Button? whiteboardButton;
     private readonly StackPanel panel = new() { Margin = new Thickness(3) };
     private readonly Dictionary<DrawTool, Button> toolButtons = new();
@@ -376,10 +377,12 @@ public sealed class ToolbarWindow : Window
         panel.Children.Add(MakeIconButton("전체 지우기", "M 5,7 L 19,7 M 9,7 L 9,4 15,4 15,7 M 7,9 L 8,21 16,21 17,9 M 11,11 L 11,18 M 14,11 L 14,18", overlay.Clear));
         whiteboardButton = MakeIconButton("흰 배경 모니터 선택", "M 3,4 L 21,4 21,20 3,20 Z M 7,9 L 17,9 M 7,13 L 15,13", ShowWhiteboardMenu);
         panel.Children.Add(whiteboardButton);
+        panel.Children.Add(MakeIconButton("마우스 강조 설정", "M 12,3 A 9,9 0 1 1 11.99,3 Z M 12,7 L 12,17 M 7,12 L 17,12", () => mouseHighlight.ShowSettings(this)));
         panel.Children.Add(MakeIconButton("단축키 설정", "M 4,7 L 20,7 20,18 4,18 Z M 7,11 L 9,11 M 11,11 L 13,11 M 15,11 L 17,11 M 8,15 L 16,15", () => shortcuts?.ShowSettings(this)));
         panel.Children.Add(MakeIconButton("종료", "M 5,5 L 19,19 M 19,5 L 5,19", Close));
         SourceInitialized += (_, _) => shortcuts = new ShortcutManager(this, overlay);
         Closed += (_, _) => shortcuts?.Dispose();
+        Closed += (_, _) => mouseHighlight.Close();
 
         overlay.ToolStateChanged += Refresh;
         Refresh();
