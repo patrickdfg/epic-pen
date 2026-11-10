@@ -1,6 +1,7 @@
 // 윈도우 화면 위에 투명 판서창과 독립 도구막대를 표시하는 판서 엔진입니다.
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
