@@ -45,7 +45,7 @@ public sealed class OverlayWindow : Window
     private static readonly Brush HitBackground = CreateHitBackground();
 
     private readonly InkCanvas ink = new();
-    private readonly Border whiteboard = new() { Background = Brushes.White, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+    private readonly Canvas whiteboard = new() { Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     public bool WhiteboardVisible => whiteboard.Visibility == Visibility.Visible;
     private readonly Canvas shapes = new();
     private readonly List<object> history = new();
@@ -258,11 +258,41 @@ public sealed class OverlayWindow : Window
         }
     }
 
-    // 기존 판서를 지우지 않고 흰 배경만 전환합니다.
+    // 선택한 모니터에만 흰 배경을 깔고 기존 판서는 유지합니다.
+    public void SetWhiteboardScreens(int[] screenIndices)
+    {
+        whiteboard.Children.Clear();
+        var screens = System.Windows.Forms.Screen.AllScreens;
+        var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        foreach (var index in screenIndices)
+        {
+            if (index < 0 || index >= screens.Length) continue;
+            var bounds = screens[index].Bounds;
+            var topLeft = transform.Transform(new Point(bounds.Left, bounds.Top));
+            var bottomRight = transform.Transform(new Point(bounds.Right, bounds.Bottom));
+            var rect = new Rectangle
+            {
+                Width = bottomRight.X - topLeft.X,
+                Height = bottomRight.Y - topLeft.Y,
+                Fill = Brushes.White,
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(rect, topLeft.X - Left);
+            Canvas.SetTop(rect, topLeft.Y - Top);
+            whiteboard.Children.Add(rect);
+        }
+        whiteboard.Visibility = whiteboard.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ToolStateChanged?.Invoke();
+    }
+
     public void ToggleWhiteboard()
     {
-        whiteboard.Visibility = WhiteboardVisible ? Visibility.Collapsed : Visibility.Visible;
-        ToolStateChanged?.Invoke();
+        if (WhiteboardVisible)
+        {
+            SetWhiteboardScreens(Array.Empty<int>());
+            return;
+        }
+        SetWhiteboardScreens(System.Linq.Enumerable.Range(0, System.Windows.Forms.Screen.AllScreens.Length).ToArray());
     }
 
     public void Clear()
@@ -344,7 +374,7 @@ public sealed class ToolbarWindow : Window
         
         panel.Children.Add(MakeIconButton("되돌리기", "M 9,5 L 3,11 9,17 M 3,11 L 15,11 C 23,11 23,21 16,21", overlay.Undo));
         panel.Children.Add(MakeIconButton("전체 지우기", "M 5,7 L 19,7 M 9,7 L 9,4 15,4 15,7 M 7,9 L 8,21 16,21 17,9 M 11,11 L 11,18 M 14,11 L 14,18", overlay.Clear));
-        whiteboardButton = MakeIconButton("흰 배경 켜기/끄기", "M 3,4 L 21,4 21,20 3,20 Z M 7,9 L 17,9 M 7,13 L 15,13", overlay.ToggleWhiteboard);
+        whiteboardButton = MakeIconButton("흰 배경 모니터 선택", "M 3,4 L 21,4 21,20 3,20 Z M 7,9 L 17,9 M 7,13 L 15,13", ShowWhiteboardMenu);
         panel.Children.Add(whiteboardButton);
         panel.Children.Add(MakeIconButton("단축키 설정", "M 4,7 L 20,7 20,18 4,18 Z M 7,11 L 9,11 M 11,11 L 13,11 M 15,11 L 17,11 M 8,15 L 16,15", () => shortcuts?.ShowSettings(this)));
         panel.Children.Add(MakeIconButton("종료", "M 5,5 L 19,19 M 19,5 L 5,19", Close));
@@ -354,6 +384,35 @@ public sealed class ToolbarWindow : Window
         overlay.ToolStateChanged += Refresh;
         Refresh();
         Closed += (_, _) => overlay.Close();
+    }
+
+    // 듀얼 모니터에서는 흰 배경을 표시할 화면을 고릅니다.
+    private void ShowWhiteboardMenu()
+    {
+        var screens = System.Windows.Forms.Screen.AllScreens;
+        if (screens.Length == 1)
+        {
+            overlay.ToggleWhiteboard();
+            return;
+        }
+
+        var menu = new ContextMenu();
+        for (int i = 0; i < screens.Length; i++)
+        {
+            int index = i;
+            var item = new MenuItem { Header = $"모니터 {i + 1}" + (screens[i].Primary ? " (주 화면)" : "") };
+            item.Click += (_, _) => overlay.SetWhiteboardScreens(new[] { index });
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        var all = new MenuItem { Header = "전체 모니터" };
+        all.Click += (_, _) => overlay.ToggleWhiteboard();
+        menu.Items.Add(all);
+        var off = new MenuItem { Header = "흰 배경 끄기" };
+        off.Click += (_, _) => overlay.SetWhiteboardScreens(Array.Empty<int>());
+        menu.Items.Add(off);
+        menu.PlacementTarget = whiteboardButton;
+        menu.IsOpen = true;
     }
 
     private void AddTool(string label, DrawTool tool, string path)
