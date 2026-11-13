@@ -14,7 +14,7 @@ using System.Windows.Shapes;
 
 namespace EpicPen;
 
-public enum DrawTool { Mouse, Pen, Highlighter, Eraser, Line, Rectangle, Ellipse }
+public enum DrawTool { Mouse, Pen, Highlighter, Eraser, Line, Rectangle, Ellipse, Text }
 
 public sealed class AppEntry : Application
 {
@@ -32,7 +32,7 @@ public sealed class AppEntry : Application
     }
 }
 
-public sealed class OverlayWindow : Window
+public sealed partial class OverlayWindow : Window
 {
     private const int GwlExstyle = -20;
     private const int WsExTransparent = 0x20;
@@ -79,7 +79,9 @@ public sealed class OverlayWindow : Window
         root.Children.Add(whiteboard);
         root.Children.Add(ink);
         root.Children.Add(shapes);
+        root.Children.Add(textLayer);
         Content = root;
+        InitializeTextTool();
 
         ink.EditingMode = InkCanvasEditingMode.None;
         ink.StrokeCollected += (_, e) => history.Add(e.Stroke);
@@ -90,7 +92,7 @@ public sealed class OverlayWindow : Window
         root.PreviewMouseLeftButtonDown += (_, e) => EraseShapes(e);
         root.PreviewMouseMove += (_, e) => { if (e.LeftButton == MouseButtonState.Pressed) EraseShapes(e); };
         SourceInitialized += (_, _) => SetClickThrough(true);
-        KeyDown += (_, e) => { if (e.Key == Key.Escape) SetTool(DrawTool.Mouse); };
+        PreviewKeyDown += (_, e) => HandleAnnotationKey(e);
         ApplyDrawingAttributes();
     }
 
@@ -113,7 +115,13 @@ public sealed class OverlayWindow : Window
     public void SetTool(DrawTool next)
     {
         FinishShape();
+        if (Tool == DrawTool.Text && next != DrawTool.Text)
+        {
+            FinishTextEdit();
+            SelectText(null);
+        }
         Tool = next;
+        textLayer.IsHitTestVisible = next == DrawTool.Text;
         ink.EditingMode = next switch
         {
             DrawTool.Pen or DrawTool.Highlighter => InkCanvasEditingMode.Ink,
@@ -123,12 +131,25 @@ public sealed class OverlayWindow : Window
         ApplyDrawingAttributes();
         SetClickThrough(next == DrawTool.Mouse);
         if (next != DrawTool.Mouse) Activate();
+        if (next == DrawTool.Text) Keyboard.Focus((IInputElement?)textEditor ?? textLayer);
         ToolStateChanged?.Invoke();
     }
 
     public void SetColor(Color value)
     {
         PenColor = value;
+        if (selectedText != null)
+        {
+            var brush = new SolidColorBrush(value);
+            selectedText.Label.Foreground = brush;
+            if (textEditor != null)
+            {
+                textEditor.Foreground = brush;
+                textEditor.CaretBrush = brush;
+                Activate();
+                textEditor.Focus();
+            }
+        }
         if (Tool is DrawTool.Mouse or DrawTool.Eraser) SetTool(DrawTool.Pen);
         else { ApplyDrawingAttributes(); ToolStateChanged?.Invoke(); }
     }
@@ -242,6 +263,7 @@ public sealed class OverlayWindow : Window
     public void Undo()
     {
         FinishShape();
+        FinishTextEdit();
         while (history.Count > 0)
         {
             var last = history[^1];
@@ -254,6 +276,11 @@ public sealed class OverlayWindow : Window
             if (last is UIElement element && shapes.Children.Contains(element))
             {
                 shapes.Children.Remove(element);
+                return;
+            }
+            if (last is TextAnnotation annotation && textLayer.Children.Contains(annotation))
+            {
+                RemoveText(annotation);
                 return;
             }
         }
@@ -299,6 +326,9 @@ public sealed class OverlayWindow : Window
     public void Clear()
     {
         FinishShape();
+        FinishTextEdit(cancel: true);
+        SelectText(null);
+        textLayer.Children.Clear();
         ink.Strokes.Clear();
         shapes.Children.Clear();
         history.Clear();
@@ -342,6 +372,7 @@ public sealed class ToolbarWindow : Window
         AddTool("직선", DrawTool.Line, "M 3,21 L 21,3");
         AddTool("사각형", DrawTool.Rectangle, "M 4,4 L 20,4 20,20 4,20 Z");
         AddTool("원", DrawTool.Ellipse, "M 12,3 A 9,9 0 1 1 11.99,3 Z");
+        AddTool("텍스트 (T)", DrawTool.Text, "M 4,4 L 20,4 M 12,4 L 12,20");
 
         
         var colors = new WrapPanel();
@@ -382,6 +413,7 @@ public sealed class ToolbarWindow : Window
         panel.Children.Add(MakeIconButton("단축키 설정", "M 4,7 L 20,7 20,18 4,18 Z M 7,11 L 9,11 M 11,11 L 13,11 M 15,11 L 17,11 M 8,15 L 16,15", () => shortcuts?.ShowSettings(this)));
         panel.Children.Add(MakeIconButton("종료", "M 5,5 L 19,19 M 19,5 L 5,19", Close));
         SourceInitialized += (_, _) => shortcuts = new ShortcutManager(this, overlay);
+        PreviewKeyDown += (_, e) => overlay.HandleAnnotationKey(e);
         Closed += (_, _) => shortcuts?.Dispose();
         Closed += (_, _) => mouseHighlight.Close();
 
